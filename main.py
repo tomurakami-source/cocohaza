@@ -68,15 +68,17 @@ def _check_rate_limit(ip: str) -> bool:
     return True
 
 
-# ── ライフサイクル（非推奨 on_event → lifespan）────────────
-@asynccontextmanager
-async def lifespan(app: FastAPI):
+# ── ポリゴンデータ初期化 ─────────────────────────────────
+# Render/通常サーバー: lifespan で起動時に一括ロード（高速）
+# Vercel サーバーレス: lifespan が呼ばれないため hazard.py 側で遅延ロード
+
+def _preload_polygons():
+    """ポリゴンデータを一括ロード（Render / ローカル用）"""
     from pathlib import Path
     from hazard import _load_flood_mesh
 
     logger.info("ポリゴンデータのプリロードを開始...")
     data_dir = Path(__file__).parent / "data"
-    # DISABLE_FLOOD_POLYGON=1 の場合は洪水ポリゴンを読み込まない（省メモリモード）
     if os.getenv("DISABLE_FLOOD_POLYGON") != "1":
         for path in sorted(data_dir.glob("flood_*.json")):
             mesh = int(path.stem.replace("flood_", ""))
@@ -87,6 +89,11 @@ async def lifespan(app: FastAPI):
     _load_inland_flood_zones()
     _load_tsunami_zones()
     logger.info("ポリゴンデータのプリロード完了")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    _preload_polygons()
     yield
 
 
