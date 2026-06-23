@@ -1,0 +1,1175 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CocoHaza / ココハザード</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+       background: #f5f5f5; color: #222; }
+
+header { background: #1a1a2e; color: #fff; padding: 16px 24px;
+         display: flex; align-items: center; justify-content: space-between; }
+.header-left { flex: 1; }
+header h1 { font-size: 1.2rem; font-weight: 700; letter-spacing: .05em; }
+header p  { font-size: .75rem; color: #aaa; margin-top: 2px; }
+.header-links { display: flex; gap: 16px; align-items: center; flex-shrink: 0; }
+.header-links a { color: #aaa; text-decoration: none; font-size: .75rem; }
+.header-links a:hover { color: #fff; }
+
+.search-bar { background: #fff; padding: 12px 20px;
+              box-shadow: 0 1px 4px rgba(0,0,0,.1);
+              display: flex; gap: 10px; align-items: center; }
+.search-bar input { flex: 1; padding: 9px 14px; font-size: .95rem;
+                     border: 1px solid #ccc; border-radius: 6px; outline: none; }
+.search-bar input:focus { border-color: #e74c3c; }
+.search-bar button { padding: 9px 20px; background: #e74c3c; color: #fff;
+                      border: none; border-radius: 6px; font-size: .95rem;
+                      cursor: pointer; white-space: nowrap; }
+.search-bar button:hover { background: #c0392b; }
+
+.container { display: flex; height: calc(100vh - 108px); }
+#map { flex: 1; }
+
+/* パネル全体 */
+.panel { width: 360px; background: #fff; overflow-y: auto;
+         box-shadow: -2px 0 8px rgba(0,0,0,.08); flex-shrink: 0;
+         display: flex; flex-direction: column; }
+
+/* ── お気に入りセクション（上部固定）── */
+#fav-section { flex-shrink: 0; }
+
+.fav-wrap { border-bottom: 2px solid #f0f0f0; padding: 10px 14px; background: #fffdf5; }
+.fav-header { display: flex; align-items: center; justify-content: space-between;
+              margin-bottom: 8px; }
+.fav-header span { font-size: .78rem; font-weight: 700; color: #e67e22;
+                   letter-spacing: .05em; }
+.fav-count { font-size: .72rem; background: #e67e22; color: #fff;
+             padding: 1px 7px; border-radius: 10px; font-weight: 700; }
+
+.fav-item { display: flex; align-items: center; gap: 6px;
+            padding: 6px 8px; border-radius: 6px; margin-bottom: 5px;
+            background: #fff; border: 1px solid #f0e4cc; }
+.fav-item:last-child { margin-bottom: 0; }
+
+.fav-score-badge { font-size: 1.1rem; font-weight: 800; flex-shrink: 0;
+                   width: 28px; text-align: center; }
+.fav-addr { font-size: .78rem; color: #333; flex: 1; line-height: 1.3;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fav-actions { display: flex; gap: 4px; flex-shrink: 0; }
+.fav-btn { padding: 3px 7px; border: none; border-radius: 4px; cursor: pointer;
+           font-size: .72rem; white-space: nowrap; }
+.fav-btn-view    { background: #f0f0f0; color: #555; }
+.fav-btn-view:hover { background: #e0e0e0; }
+.fav-btn-compare { background: #dbeeff; color: #2980b9; }
+.fav-btn-compare:hover { background: #c5dff8; }
+.fav-btn-del     { background: #fee; color: #c0392b; }
+.fav-btn-del:hover { background: #fcc; }
+
+/* ── 結果セクション（スクロール可）── */
+#result-section { flex: 1; overflow-y: auto; padding: 18px; }
+
+.empty-state { text-align: center; padding: 60px 20px; color: #999; }
+.empty-state .icon { font-size: 3rem; margin-bottom: 12px; }
+
+.result-address { font-size: .82rem; color: #666; margin-bottom: 14px;
+                  padding-bottom: 12px; border-bottom: 1px solid #eee; }
+
+.total-score { text-align: center; margin-bottom: 18px; }
+.total-score .label { font-size: .75rem; color: #888; letter-spacing: .1em; margin-bottom: 4px; }
+.total-score .number { font-size: 4.5rem; font-weight: 800; line-height: 1; }
+.total-score .out-of { font-size: 1.1rem; color: #999; }
+.total-score .risk-label { font-size: .95rem; font-weight: 600; margin-top: 4px; }
+
+.breakdown h3 { font-size: .75rem; color: #888; letter-spacing: .1em; margin-bottom: 10px; }
+.risk-item { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
+.risk-item .name { width: 72px; font-size: .82rem; color: #444; flex-shrink: 0; }
+.risk-item .bar-wrap { flex: 1; background: #f0f0f0; border-radius: 4px; height: 7px; }
+.risk-item .bar { height: 7px; border-radius: 4px; transition: width .5s ease; }
+.risk-item .val { width: 20px; text-align: right; font-size: .82rem;
+                  font-weight: 700; flex-shrink: 0; }
+/* バーの直下に根拠テキストを同じ左端で揃える */
+.risk-expl { font-size: .72rem; color: #999; line-height: 1.4;
+             padding-left: 80px; margin-bottom: 8px; }
+
+.meta { margin-top: 16px; padding-top: 14px; border-top: 1px solid #eee;
+        font-size: .72rem; color: #999; line-height: 1.7; }
+
+.error { background: #fff3f3; border: 1px solid #e74c3c; border-radius: 6px;
+         padding: 12px; color: #c0392b; font-size: .88rem; }
+.loading { text-align: center; padding: 40px; color: #999; }
+
+/* ボタン群 */
+.action-btns { display: flex; gap: 6px; margin-top: 14px; flex-wrap: wrap; }
+.btn-primary  { flex: 1; padding: 8px 6px; background: #f0f7ff; border: 1px solid #3498db;
+                border-radius: 6px; cursor: pointer; font-size: .82rem; color: #2980b9; }
+.btn-primary:hover { background: #dbeeff; }
+.btn-secondary { flex: 1; padding: 8px 6px; background: #f8f9fa; border: 1px solid #ddd;
+                 border-radius: 6px; cursor: pointer; font-size: .82rem; color: #555; }
+.btn-secondary:hover { background: #eee; }
+.btn-fav { flex: 1; padding: 8px 6px; border-radius: 6px; cursor: pointer;
+           font-size: .82rem; border: 1px solid #e67e22; }
+.btn-fav.off { background: #fff8f0; color: #e67e22; }
+.btn-fav.off:hover { background: #feecd8; }
+.btn-fav.on  { background: #e67e22; color: #fff; }
+.btn-fav.on:hover  { background: #d35400; }
+
+/* 比較 */
+.compare-input-wrap { margin-top: 14px; padding: 12px; background: #f0f7ff;
+                       border-radius: 8px; border: 1px solid #c5dff8; }
+.compare-input-wrap label { font-size: .78rem; color: #2980b9; display: block; margin-bottom: 6px; }
+.compare-input-wrap input { width: 100%; padding: 8px 10px; border: 1px solid #c5dff8;
+                             border-radius: 4px; font-size: .88rem; outline: none; }
+.compare-input-wrap button { width: 100%; margin-top: 8px; padding: 8px;
+                              background: #3498db; color: #fff; border: none;
+                              border-radius: 4px; cursor: pointer; font-size: .88rem; }
+.compare-input-wrap button:hover { background: #2980b9; }
+
+.compare-header { text-align: center; padding: 10px 0; font-size: .8rem;
+                  color: #888; border-bottom: 1px solid #eee; margin-bottom: 12px; }
+.compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+.compare-card { text-align: center; padding: 10px 6px; border-radius: 8px; border: 2px solid; }
+.compare-card.card-a { border-color: #e74c3c; background: #fff8f8; }
+.compare-card.card-b { border-color: #3498db; background: #f0f7ff; }
+.compare-card .c-addr { font-size: .72rem; color: #666; margin-bottom: 4px;
+                         white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.compare-card .c-score { font-size: 2.8rem; font-weight: 800; line-height: 1; }
+.compare-card .c-label { font-size: .75rem; margin-top: 2px; }
+
+.compare-table { width: 100%; border-collapse: collapse; font-size: .82rem; margin-top: 8px; }
+.compare-table th { font-size: .72rem; color: #888; padding: 4px 6px;
+                    text-align: right; font-weight: 400; }
+.compare-table th:first-child { text-align: left; }
+.compare-table td { padding: 5px 6px; text-align: right; border-bottom: 1px solid #f5f5f5; }
+.compare-table td:first-child { text-align: left; color: #555; }
+.compare-table .winner { font-weight: 700; }
+.compare-table .loser  { color: #bbb; }
+
+/* 3地点カード */
+.compare-card.card-c { border-color: #27ae60; background: #f0fff4; }
+.compare-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-bottom: 14px; }
+.compare-grid-3 .compare-card { padding: 8px 4px; }
+.compare-grid-3 .c-score { font-size: 2rem; }
+.compare-grid-3 .c-addr { font-size: .65rem; }
+.compare-grid-3 .c-label { font-size: .68rem; }
+
+/* 比較をやめるボタン */
+.btn-stop-compare { padding: 7px 12px; background: #f8f9fa; border: 1px solid #ccc;
+                    border-radius: 6px; cursor: pointer; font-size: .82rem; color: #666;
+                    white-space: nowrap; flex-shrink: 0; }
+.btn-stop-compare:hover { background: #eee; color: #333; }
+
+/* まとめて比較ボタン */
+.btn-all-compare { width: 100%; margin-top: 8px; padding: 7px; background: #fff3cd;
+                   border: 1px solid #e6a817; border-radius: 6px; cursor: pointer;
+                   font-size: .82rem; color: #856404; font-weight: 600; }
+.btn-all-compare:hover { background: #ffe69c; }
+
+/* スコア色 */
+.score-1,.score-2 { color: #27ae60; }
+.score-3,.score-4 { color: #2ecc71; }
+.score-5,.score-6 { color: #f39c12; }
+.score-7,.score-8 { color: #e67e22; }
+.score-9,.score-10 { color: #e74c3c; }
+
+
+/* ── オートコンプリート ── */
+.search-bar { position: relative; }
+#ac-dropdown { position: absolute; top: 100%; left: 0; right: 0; z-index: 2000;
+               background: #fff; border: 1px solid #ddd; border-top: none;
+               border-radius: 0 0 8px 8px; box-shadow: 0 6px 16px rgba(0,0,0,.12);
+               max-height: 240px; overflow-y: auto; display: none; }
+.ac-item { padding: 10px 16px; font-size: .9rem; cursor: pointer;
+           border-bottom: 1px solid #f5f5f5; white-space: nowrap;
+           overflow: hidden; text-overflow: ellipsis; }
+.ac-item:last-child { border-bottom: none; }
+.ac-item:hover, .ac-item.active { background: #f0f7ff; }
+
+/* ── 被災履歴 ── */
+.disaster-history { margin-top: 16px; }
+.disaster-history h4 { font-size: .78rem; color: #888; letter-spacing: .08em;
+                        text-transform: uppercase; margin-bottom: 8px; }
+.disaster-item { display: flex; gap: 8px; align-items: flex-start;
+                 padding: 7px 0; border-bottom: 1px solid #f5f5f5; font-size: .8rem; }
+.disaster-item:last-child { border-bottom: none; }
+.disaster-badge { flex-shrink: 0; padding: 1px 6px; border-radius: 4px;
+                  font-size: .68rem; font-weight: 700; white-space: nowrap; }
+.badge-flood    { background: #dbeeff; color: #1a5276; }
+.badge-quake    { background: #fde8e8; color: #922b21; }
+.badge-typhoon  { background: #e8f8f5; color: #1a5c47; }
+.badge-landslide { background: #fef9e7; color: #7d6608; }
+.disaster-text  { flex: 1; line-height: 1.5; }
+.disaster-text strong { color: #333; }
+.disaster-year  { flex-shrink: 0; color: #aaa; font-size: .72rem; }
+
+/* ── モバイル対応 ── */
+@media (max-width: 768px) {
+  header { padding: 12px 16px; flex-direction: column; align-items: flex-start; gap: 8px; }
+  .header-left { width: 100%; }
+  header p { display: none; }
+  .header-links { gap: 12px; }
+
+  .search-bar { padding: 10px 12px; gap: 8px; }
+  .search-bar input { font-size: .9rem; padding: 9px 12px; }
+  .search-bar button { padding: 9px 14px; font-size: .85rem; }
+
+  /* 地図＋パネルを縦積み */
+  .container { flex-direction: column; height: auto;
+               min-height: calc(100dvh - 96px); }
+  #map { height: 45dvh; min-height: 240px; flex: none; }
+  .panel { width: 100%; max-height: 55dvh; flex: 1;
+           box-shadow: 0 -3px 10px rgba(0,0,0,.12); }
+
+  /* スコア数字を小さく */
+  .total-score .number { font-size: 3.5rem; }
+
+  /* ボタンを太くして押しやすく */
+  .btn-fav, .btn-primary, .btn-secondary { padding: 10px 6px; font-size: .8rem; }
+  .fav-btn { padding: 5px 8px; font-size: .78rem; }
+
+  /* レーダーチャートを小さく */
+  .radar-chart { max-width: 220px !important; }
+
+  /* 比較グリッドは2列維持 */
+  .compare-grid-3 { grid-template-columns: repeat(3, 1fr); }
+
+  .ac-item { padding: 12px 16px; font-size: .95rem; }
+}
+
+/* トースト */
+.toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+         background: #333; color: #fff; padding: 10px 22px; border-radius: 20px;
+         font-size: .85rem; opacity: 0; transition: opacity .3s; pointer-events: none;
+         z-index: 9999; white-space: nowrap; }
+.toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <h1>CocoHaza / ココハザード</h1>
+    <p>住所入力 または 地図ダブルクリックでリスクを確認</p>
+  </div>
+  <div class="header-links">
+    <a href="/landing.html">ホーム</a>
+    <a href="/methodology.html" target="_blank">説明</a>
+    <a href="/terms.html" target="_blank">規約</a>
+  </div>
+</header>
+
+<div class="search-bar">
+  <input type="text" id="address-input" placeholder="例: 東京都江東区豊洲3丁目"/>
+  <button onclick="search()">リスクを調べる</button>
+</div>
+
+<div class="container">
+  <div id="map"></div>
+  <div class="panel">
+    <div id="fav-section"></div>
+    <div id="result-section">
+      <div class="empty-state">
+        <div class="icon">🗾</div>
+        <p>住所を入力するか<br>地図をダブルクリックして<br>リスクスコアを確認してください</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── 地図初期化 ────────────────────────────────────────
+const map = L.map('map').setView([35.68, 139.76], 10);
+L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png', {
+  attribution: '<a href="https://maps.gsi.go.jp/development/ichiran.html">国土地理院</a>',
+  maxZoom: 18
+}).addTo(map);
+
+let markers = [];
+let dataA   = null;
+
+// ── お気に入り管理 ────────────────────────────────────
+const MAX_FAV = 3;
+let favorites = JSON.parse(localStorage.getItem('risk_favorites') || '[]');
+
+function saveFavs() { localStorage.setItem('risk_favorites', JSON.stringify(favorites)); }
+
+function isFav(address) { return favorites.some(f => f.address === address); }
+
+function toggleFav(d) {
+  if (isFav(d.address)) {
+    favorites = favorites.filter(f => f.address !== d.address);
+    saveFavs();
+    renderFavSection();
+    renderStarBtn(d);
+    showToast('お気に入りから削除しました');
+  } else {
+    if (favorites.length >= MAX_FAV) {
+      showToast(`お気に入りは${MAX_FAV}件までです`);
+      return;
+    }
+    favorites.push({
+      address: d.address, lat: d.lat, lng: d.lng,
+      score: d.score, jshis_prob: d.jshis_prob, geology: d.geology
+    });
+    saveFavs();
+    renderFavSection();
+    renderStarBtn(d);
+    showToast('★ お気に入りに追加しました');
+  }
+}
+
+function renderFavSection() {
+  const sec = document.getElementById('fav-section');
+  if (favorites.length === 0) { sec.innerHTML = ''; return; }
+
+  // XSS対策: innerHTML に住所を埋め込まず、DOM操作 + data属性 + addEventListener を使用
+  const wrap = document.createElement('div');
+  wrap.className = 'fav-wrap';
+
+  const header = document.createElement('div');
+  header.className = 'fav-header';
+  header.innerHTML = `<span>★ お気に入り</span><span class="fav-count">${favorites.length}/${MAX_FAV}</span>`;
+  wrap.appendChild(header);
+
+  favorites.forEach((fav, i) => {
+    const color = scoreColor(fav.score.total);
+    const item = document.createElement('div');
+    item.className = 'fav-item';
+
+    const badge = document.createElement('div');
+    badge.className = 'fav-score-badge';
+    badge.style.color = color;
+    badge.textContent = fav.score.total;
+
+    const addr = document.createElement('div');
+    addr.className = 'fav-addr';
+    addr.title = fav.address;
+    addr.textContent = fav.address;
+
+    const actions = document.createElement('div');
+    actions.className = 'fav-actions';
+
+    const btnView = document.createElement('button');
+    btnView.className = 'fav-btn fav-btn-view';
+    btnView.textContent = '📍';
+    btnView.addEventListener('click', () => loadFav(encodeURIComponent(fav.address)));
+
+    const btnCompare = document.createElement('button');
+    btnCompare.className = 'fav-btn fav-btn-compare';
+    btnCompare.textContent = '比較';
+    btnCompare.addEventListener('click', () => compareFav(encodeURIComponent(fav.address)));
+
+    const btnDel = document.createElement('button');
+    btnDel.className = 'fav-btn fav-btn-del';
+    btnDel.textContent = '✕';
+    btnDel.addEventListener('click', () => deleteFav(encodeURIComponent(fav.address)));
+
+    actions.append(btnView, btnCompare, btnDel);
+    item.append(badge, addr, actions);
+    wrap.appendChild(item);
+  });
+
+  if (favorites.length >= 2) {
+    const allBtn = document.createElement('button');
+    allBtn.className = 'btn-all-compare';
+    allBtn.textContent = `📊 ${favorites.length}件まとめて比較`;
+    allBtn.addEventListener('click', compareAllFavs);
+    wrap.appendChild(allBtn);
+  }
+
+  sec.innerHTML = '';
+  sec.appendChild(wrap);
+}
+
+function getFavByAddr(encoded) {
+  const address = decodeURIComponent(encoded);
+  return favorites.find(f => f.address === address);
+}
+
+function loadFav(encoded) {
+  const fav = getFavByAddr(encoded);
+  if (!fav) return;
+  dataA = fav;
+  document.getElementById('address-input').value = fav.address;
+  history.replaceState(null, '', `?address=${encodeURIComponent(fav.address)}`);
+  placeMarker(fav, 'A');
+  map.setView([fav.lat, fav.lng], 14);
+  showResult(fav);
+}
+
+function compareFav(encoded) {
+  const fav = getFavByAddr(encoded);
+  if (!fav) return;
+  if (!dataA) { loadFav(encoded); return; }
+  placeMarker(fav, 'B');
+  showResult(dataA);
+  showComparison(dataA, fav);
+}
+
+function compareAllFavs() {
+  if (favorites.length < 2) return;
+  const keys = ['A', 'B', 'C'];
+  // 既存マーカーを全てクリアして再配置
+  markers.forEach(m => map.removeLayer(m));
+  markers = [];
+  favorites.slice(0, 3).forEach((fav, i) => placeMarker(fav, keys[i]));
+
+  const items = favorites.slice(0, 3);
+  const colors = [MARKER_COLORS.A, MARKER_COLORS.B, MARKER_COLORS.C];
+  const FACTORS = [
+    ['flood','水害'],['earthquake','地震'],['liquefaction','液状化'],
+    ['sediment','土砂'],['typhoon','台風'],['coastal','津波・高潮'],
+  ];
+
+  const gridClass = items.length === 3 ? 'compare-grid-3' : 'compare-grid';
+  const cardClasses = ['card-a','card-b','card-c'];
+
+  const cards = items.map((item, i) => `
+    <div class="compare-card ${cardClasses[i]}">
+      <div class="c-addr" title="${item.address}">地点${keys[i]}: ${item.address}</div>
+      <div class="c-score score-${item.score.total}">${item.score.total}</div>
+      <div class="c-label" style="color:${scoreColor(item.score.total)}">${riskLabel(item.score.total)}</div>
+    </div>`).join('');
+
+  const thHeaders = items.map((_,i) =>
+    `<th style="color:${colors[i]}">地点${keys[i]}</th>`).join('');
+
+  const tableRows = FACTORS.map(([key, label]) => {
+    const vals = items.map(it => it.score[key]);
+    const maxVal = Math.max(...vals);
+    const cells = vals.map((v, i) => {
+      const cls = v === maxVal ? 'winner' : 'loser';
+      return `<td class="${cls}" style="color:${scoreColor(v)}">${v}</td>`;
+    }).join('');
+    return `<tr><td>${label}</td>${cells}</tr>`;
+  }).join('');
+
+  const [a, b, c] = items;
+  const chart = items.length === 3
+    ? radarChart(a.score, colors[0], b.score, colors[1], c.score, colors[2])
+    : radarChart(a.score, colors[0], b.score, colors[1]);
+
+  dataA = items[0];
+
+  setResult(`
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <span style="font-size:.82rem;color:#666">📊 お気に入り まとめて比較</span>
+      <button class="btn-stop-compare" onclick="stopCompare()">✕ 比較をやめる</button>
+    </div>
+    <div class="${gridClass}">${cards}</div>
+    ${chart}
+    <table class="compare-table">
+      <tr><th>リスク要因</th>${thHeaders}</tr>
+      ${tableRows}
+    </table>
+    <button class="btn-primary" style="width:100%;margin-top:12px" onclick="showCompareInput()">
+      別の住所とさらに比較
+    </button>
+    <div id="compare-section"></div>`);
+
+  map.fitBounds(items.map(f => [f.lat, f.lng]), {padding: [40, 40]});
+}
+
+function stopCompare() {
+  // B・C マーカーを削除してAだけ残す
+  ['B', 'C'].forEach(key => {
+    markers.filter(m => m._key === key).forEach(m => map.removeLayer(m));
+    markers = markers.filter(m => m._key !== key);
+  });
+  if (dataA) {
+    placeMarker(dataA, 'A');
+    map.setView([dataA.lat, dataA.lng], 14);
+    showResult(dataA);
+  }
+}
+
+function deleteFav(encoded) {
+  const address = decodeURIComponent(encoded);
+  favorites = favorites.filter(f => f.address !== address);
+  saveFavs();
+  renderFavSection();
+  // 現在表示中の結果の星ボタンを更新
+  if (dataA && dataA.address === address) renderStarBtn(dataA);
+  showToast('削除しました');
+}
+
+function renderStarBtn(d) {
+  const btn = document.getElementById('star-btn');
+  if (!btn || !d) return;
+  const on = isFav(d.address);
+  btn.className = `btn-fav ${on ? 'on' : 'off'}`;
+  btn.textContent = on ? '★ 保存済み' : '☆ お気に入り';
+}
+
+// ── ユーティリティ ────────────────────────────────────
+function escapeHtml(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function scoreColor(s) {
+  if (s <= 2) return '#27ae60';
+  if (s <= 4) return '#2ecc71';
+  if (s <= 6) return '#f39c12';
+  if (s <= 8) return '#e67e22';
+  return '#e74c3c';
+}
+function riskLabel(s) {
+  if (s <= 2) return '低リスク';
+  if (s <= 4) return 'やや低リスク';
+  if (s <= 6) return '中程度のリスク';
+  if (s <= 8) return '高リスク';
+  return '非常に高リスク';
+}
+function barItem(name, val, expl) {
+  const color = scoreColor(val);
+  const explHtml = expl ? `<div class="risk-expl">${escapeHtml(expl)}</div>` : '';
+  return `<div class="risk-item">
+    <span class="name">${name}</span>
+    <div class="bar-wrap"><div class="bar" style="width:${val*10}%;background:${color}"></div></div>
+    <span class="val" style="color:${color}">${val}</span>
+  </div>${explHtml}`;
+}
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// ── レーダーチャート ──────────────────────────────────
+const RADAR_KEYS   = ['flood','earthquake','liquefaction','sediment','typhoon','coastal'];
+const RADAR_LABELS = ['水害','地震','液状化','土砂','台風','津波'];
+
+function radarPath(scores, cx, cy, r) {
+  return RADAR_KEYS.map((k, i) => {
+    const angle = (i * 2 * Math.PI / 6) - Math.PI / 2;
+    const d = (scores[k] / 10) * r;
+    return [cx + d * Math.cos(angle), cy + d * Math.sin(angle)];
+  }).map(([x, y], i) => `${i===0?'M':'L'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ') + 'Z';
+}
+
+function radarChart(scoresA, colorA, scoresB=null, colorB=null, scoresC=null, colorC=null) {
+  const cx=120, cy=115, r=78;
+  const grids = [2,4,6,8,10].map(lv => {
+    const pts = RADAR_KEYS.map((_,i) => {
+      const angle=(i*2*Math.PI/6)-Math.PI/2;
+      const d=(lv/10)*r;
+      return `${(cx+d*Math.cos(angle)).toFixed(1)},${(cy+d*Math.sin(angle)).toFixed(1)}`;
+    }).join(' ');
+    return `<polygon points="${pts}" fill="none" stroke="#e8e8e8" stroke-width="1"/>`;
+  }).join('');
+  const axes = RADAR_KEYS.map((_,i) => {
+    const angle=(i*2*Math.PI/6)-Math.PI/2;
+    return `<line x1="${cx}" y1="${cy}" x2="${(cx+r*Math.cos(angle)).toFixed(1)}" y2="${(cy+r*Math.sin(angle)).toFixed(1)}" stroke="#ddd" stroke-width="1"/>`;
+  }).join('');
+  const lbls = RADAR_LABELS.map((label,i) => {
+    const angle=(i*2*Math.PI/6)-Math.PI/2, d=r+17;
+    return `<text x="${(cx+d*Math.cos(angle)).toFixed(1)}" y="${(cy+d*Math.sin(angle)).toFixed(1)}" text-anchor="middle" dominant-baseline="middle" font-size="10" fill="#555">${label}</text>`;
+  }).join('');
+  const polyA = `<path d="${radarPath(scoresA,cx,cy,r)}" fill="${colorA}40" stroke="${colorA}" stroke-width="2.5"/>`;
+  const polyB = scoresB ? `<path d="${radarPath(scoresB,cx,cy,r)}" fill="${colorB}40" stroke="${colorB}" stroke-width="2"/>` : '';
+  const polyC = scoresC ? `<path d="${radarPath(scoresC,cx,cy,r)}" fill="${colorC}40" stroke="${colorC}" stroke-width="2"/>` : '';
+  let legend = '';
+  if (scoresB) {
+    const h = scoresC ? 248 : 240;
+    const items = [
+      [colorA, '地点A', 10], [colorB, '地点B', 70],
+      ...(scoresC ? [[colorC, '地点C', 130]] : [])
+    ];
+    legend = items.map(([c, lbl, x]) =>
+      `<rect x="${x}" y="${h-12}" width="10" height="10" fill="${c}40" stroke="${c}" stroke-width="1.5"/>
+       <text x="${x+14}" y="${h-3}" font-size="9" fill="#555">${lbl}</text>`
+    ).join('');
+  }
+  const height = scoresC ? 252 : (scoresB ? 244 : 230);
+  return `<svg class="radar-chart" viewBox="0 0 240 ${height}" style="width:100%;max-width:280px;display:block;margin:0 auto">${grids}${axes}${polyA}${polyB}${polyC}${lbls}${legend}</svg>`;
+}
+
+// ── 検索 ─────────────────────────────────────────────
+async function search() {
+  const address = document.getElementById('address-input').value.trim();
+  if (!address) return;
+  setResult('<div class="loading">検索中...</div>');
+  dataA = null;
+  try {
+    const res = await fetch(`/api/score?address=${encodeURIComponent(address)}`);
+    if (!res.ok) {
+      const err = await res.json();
+      setResult(`<div class="error">⚠️ ${escapeHtml(err.detail) || エラーが発生しました}</div>`);
+      return;
+    }
+    const d = await res.json();
+    dataA = d;
+    map.setView([d.lat, d.lng], 14);
+    placeMarker(d, 'A');
+    showResult(d);
+    history.replaceState(null, '', `?address=${encodeURIComponent(address)}`);
+  } catch {
+    setResult(`<div class="error">⚠️ 通信エラーが発生しました</div>`);
+  }
+}
+
+function setResult(html) {
+  document.getElementById('result-section').innerHTML = html;
+}
+
+// ── ダブルクリック ────────────────────────────────────
+map.on('dblclick', async function(e) {
+  e.originalEvent.preventDefault();
+  map.doubleClickZoom.disable();
+  const { lat, lng } = e.latlng;
+  setResult('<div class="loading">調査中...</div>');
+  dataA = null;
+  try {
+    const res = await fetch(`/api/score/latlng?lat=${lat}&lng=${lng}`);
+    if (!res.ok) {
+      const err = await res.json();
+      setResult(`<div class="error">⚠️ ${escapeHtml(err.detail)}</div>`);
+      return;
+    }
+    const d = await res.json();
+    dataA = d;
+    document.getElementById('address-input').value = d.address;
+    history.replaceState(null, '', `?address=${encodeURIComponent(d.address)}`);
+    placeMarker(d, 'A');
+    showResult(d);
+  } catch {
+    setResult(`<div class="error">⚠️ 通信エラーが発生しました</div>`);
+  }
+  setTimeout(() => map.doubleClickZoom.enable(), 300);
+});
+
+// ── マーカー ──────────────────────────────────────────
+const MARKER_COLORS = { A: '#e74c3c', B: '#3498db', C: '#27ae60' };
+function placeMarker(d, key) {
+  markers.filter(m => m._key === key).forEach(m => map.removeLayer(m));
+  markers = markers.filter(m => m._key !== key);
+  const icon = L.divIcon({
+    html: `<div style="width:28px;height:28px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:${MARKER_COLORS[key]};border:2px solid #fff;box-shadow:0 2px 4px rgba(0,0,0,.3)"></div>`,
+    iconSize: [28,28], iconAnchor: [14,28], className: ''
+  });
+  const m = L.marker([d.lat, d.lng], {icon}).addTo(map)
+    .bindPopup(`<b>地点${key}: ${escapeHtml(d.address)}</b><br>総合スコア: ${d.score.total}/10`);
+  m._key = key;
+  markers.push(m);
+}
+
+// ── 結果表示 ──────────────────────────────────────────
+function showResult(d) {
+  const s = d.score;
+  const color = scoreColor(s.total);
+  const on = isFav(d.address);
+
+  setResult(`
+    <div class="result-address">📍 ${escapeHtml(d.address)}</div>
+
+    <div class="action-btns">
+      <button id="star-btn" class="btn-fav ${on?'on':'off'}"
+        onclick='toggleFav(dataA)'>${on?'★ 保存済み':'☆ お気に入り'}</button>
+      <button class="btn-primary" onclick="showCompareInput()">📊 比較する</button>
+      <button class="btn-secondary" onclick="generatePDF()">📄 出力</button>
+    </div>
+
+    <div class="total-score" style="margin-top:14px">
+      <div class="label">総合リスクスコア</div>
+      <div class="number score-${s.total}">${s.total}<span class="out-of">/10</span></div>
+      <div class="risk-label" style="color:${color}">${riskLabel(s.total)}</div>
+    </div>
+
+    ${radarChart(s, MARKER_COLORS.A)}
+
+    <div class="breakdown" style="margin-top:14px">
+      <h3>リスク内訳</h3>
+      ${barItem('水害',      s.flood,       s.explanation?.flood)}
+      ${barItem('地震',      s.earthquake,  s.explanation?.earthquake)}
+      ${barItem('液状化',    s.liquefaction, s.explanation?.liquefaction)}
+      ${barItem('土砂',      s.sediment,    s.explanation?.sediment)}
+      ${barItem('台風',      s.typhoon,     s.explanation?.typhoon)}
+      ${barItem('津波・高潮', s.coastal,     s.explanation?.coastal)}
+    </div>
+
+    ${disasterHistoryHTML(d.pref_code || '')}
+
+    <div id="compare-section"></div>
+
+    <div class="meta">
+      地震確率（J-SHIS）: ${d.jshis_prob.toFixed(1)}%（30年・震度6弱以上）<br>
+      地質区分（産総研）: ${d.geology}<br><br>
+      <span style="background:#fff8e1;border-left:3px solid #f39c12;padding:4px 8px;display:inline-block;border-radius:2px;margin-bottom:6px;font-size:.7rem;color:#856404">
+        ⚠️ 使用データ：J-SHIS 2020年版・国土数値情報 2022年版。能登半島地震（2024年）以降の地形変化は未反映です。
+      </span><br>
+      ※ 補助資料です。防災判断には各自治体の公式ハザードマップを必ず確認してください。<br>
+      <a href="/methodology.html" target="_blank"
+         style="color:#3498db;text-decoration:none;font-size:.72rem">
+        📋 スコアの算出方法・データソース →
+      </a>
+    </div>`);
+}
+
+// ── 比較 ─────────────────────────────────────────────
+function showCompareInput() {
+  document.getElementById('compare-section').innerHTML = `
+    <div class="compare-input-wrap">
+      <label>📍 比較先の住所を入力</label>
+      <input type="text" id="compare-input" placeholder="例: 東京都文京区本郷2丁目"/>
+      <button onclick="searchCompare()">比較する</button>
+    </div>`;
+  document.getElementById('compare-input').focus();
+  document.getElementById('compare-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') searchCompare();
+  });
+}
+
+async function searchCompare() {
+  if (!dataA) return;
+  const addr = document.getElementById('compare-input').value.trim();
+  if (!addr) return;
+  document.getElementById('compare-section').innerHTML = '<div class="loading" style="padding:20px">比較中...</div>';
+  try {
+    const res = await fetch(`/api/score?address=${encodeURIComponent(addr)}`);
+    if (!res.ok) {
+      const err = await res.json();
+      document.getElementById('compare-section').innerHTML = `<div class="error">⚠️ ${escapeHtml(err.detail)}</div>`;
+      return;
+    }
+    const dataB = await res.json();
+    placeMarker(dataB, 'B');
+    showComparison(dataA, dataB);
+  } catch {
+    document.getElementById('compare-section').innerHTML = `<div class="error">⚠️ 通信エラーが発生しました</div>`;
+  }
+}
+
+function showComparison(a, b) {
+  const FACTORS = [
+    ['flood','水害'],['earthquake','地震'],['liquefaction','液状化'],
+    ['sediment','土砂'],['typhoon','台風'],['coastal','津波・高潮'],
+  ];
+  const tableRows = FACTORS.map(([key, label]) => {
+    const va=a.score[key], vb=b.score[key];
+    const ca=va>vb?'winner':va<vb?'loser':'';
+    const cb=vb>va?'winner':vb<va?'loser':'';
+    return `<tr><td>${label}</td>
+      <td class="${ca}" style="color:${scoreColor(va)}">${va}</td>
+      <td class="${cb}" style="color:${scoreColor(vb)}">${vb}</td></tr>`;
+  }).join('');
+
+  document.getElementById('compare-section').innerHTML = `
+    <div class="compare-header" style="margin-top:16px">── 比較結果 ──</div>
+    <div class="compare-grid">
+      <div class="compare-card card-a">
+        <div class="c-addr" title="${a.address}">地点A: ${a.address}</div>
+        <div class="c-score score-${a.score.total}">${a.score.total}</div>
+        <div class="c-label" style="color:${scoreColor(a.score.total)}">${riskLabel(a.score.total)}</div>
+      </div>
+      <div class="compare-card card-b">
+        <div class="c-addr" title="${b.address}">地点B: ${b.address}</div>
+        <div class="c-score score-${b.score.total}">${b.score.total}</div>
+        <div class="c-label" style="color:${scoreColor(b.score.total)}">${riskLabel(b.score.total)}</div>
+      </div>
+    </div>
+    ${radarChart(a.score, MARKER_COLORS.A, b.score, MARKER_COLORS.B)}
+    <table class="compare-table">
+      <tr><th>リスク要因</th><th style="color:#e74c3c">地点A</th><th style="color:#3498db">地点B</th></tr>
+      ${tableRows}
+    </table>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn-primary" style="flex:1" onclick="showCompareInput()">別の住所で再比較</button>
+      <button class="btn-stop-compare" onclick="stopCompare()">✕ 比較をやめる</button>
+    </div>`;
+
+  map.fitBounds([[a.lat,a.lng],[b.lat,b.lng]], {padding:[40,40]});
+}
+
+// ── URL共有 ───────────────────────────────────────────
+function copyShareUrl() {
+  navigator.clipboard.writeText(window.location.href)
+    .then(() => showToast('URLをコピーしました'))
+    .catch(() => showToast(window.location.href));
+}
+
+// ── PDF出力 ────────────────────────────────────────────
+function generatePDF() {
+  if (!dataA) return;
+  const d = dataA;
+  const s = d.score;
+  const e = s.explanation || {};
+
+  const now = new Date();
+  const dateStr = `${now.getFullYear()}年${now.getMonth()+1}月${now.getDate()}日`;
+
+  const html = `
+<html><head><meta charset="UTF-8"><title>ハザードリスク調査報告書 | CocoHaza / ココハザード</title>
+<style>
+  body { font-family: "Hiragino Sans", Arial, sans-serif; color: #333; line-height: 1.8;
+         position: relative; }
+  /* ウォーターマーク */
+  body::after { content: 'CocoHaza'; position: fixed; top: 50%; left: 50%;
+                transform: translate(-50%, -50%) rotate(-30deg);
+                font-size: 80px; font-weight: 900; color: rgba(0,0,0,.04);
+                pointer-events: none; white-space: nowrap; z-index: 9999; }
+  .header { border-bottom: 3px solid #0d0d0d; padding-bottom: 12px; margin-bottom: 20px;
+            display: flex; align-items: flex-start; justify-content: space-between; }
+  .header-left h1 { font-size: 16px; margin: 0 0 4px; color: #0d0d0d; }
+  .header-left p  { font-size: 10px; color: #666; margin: 0; }
+  .header-brand { text-align: right; }
+  .brand-name { font-size: 13px; font-weight: 900; color: #0d0d0d; letter-spacing: .05em; }
+  .brand-copy  { font-size: 9px; color: #999; margin-top: 2px; }
+  .info-box { background: #f5f5f5; border-left: 4px solid #0d0d0d; padding: 10px 12px; margin: 16px 0; }
+  .info-row { display: flex; margin-bottom: 6px; }
+  .info-label { width: 100px; font-weight: 600; font-size: 12px; }
+  .info-value { flex: 1; font-size: 12px; }
+  .score-section { margin: 20px 0; }
+  .score-item { display: flex; margin-bottom: 12px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+  .score-name { width: 80px; font-weight: 600; font-size: 12px; }
+  .score-content { flex: 1; }
+  .score-score { font-size: 14px; font-weight: 700; color: ${scoreColor(s.total)}; margin-bottom: 4px; }
+  .score-expl { font-size: 11px; color: #666; }
+  .total-box { background: ${scoreColor(s.total)}22; border: 2px solid ${scoreColor(s.total)};
+              padding: 12px; margin: 16px 0; text-align: center; }
+  .total-score { font-size: 32px; font-weight: 700; color: ${scoreColor(s.total)}; }
+  .total-label { font-size: 12px; color: #666; margin-top: 4px; }
+  .footer { margin-top: 24px; padding-top: 12px; border-top: 2px solid #0d0d0d; font-size: 10px; color: #777; }
+  .footer-brand { font-weight: 700; color: #0d0d0d; margin-bottom: 6px; font-size: 11px; }
+  .footer-copy-notice { background: #f9f9f9; border: 1px solid #ddd; padding: 6px 10px;
+                         margin-top: 10px; font-size: 9px; color: #999; border-radius: 3px; }
+</style>
+</head><body>
+
+<div class="header">
+  <div class="header-left">
+    <h1>ハザードリスク調査報告書</h1>
+    <p>※ 補助資料です。正式な重要事項説明書の代替にはなりません。</p>
+  </div>
+  <div class="header-brand">
+    <div class="brand-name">CocoHaza / ココハザード</div>
+    <div class="brand-copy">© 2026 CocoHaza</div>
+  </div>
+</div>
+
+<div class="info-box">
+  <div class="info-row">
+    <div class="info-label">調査地点</div>
+    <div class="info-value"><b>${escapeHtml(d.address)}</b></div>
+  </div>
+  <div class="info-row">
+    <div class="info-label">座標</div>
+    <div class="info-value">${d.lat.toFixed(6)}, ${d.lng.toFixed(6)}</div>
+  </div>
+  <div class="info-row">
+    <div class="info-label">調査日</div>
+    <div class="info-value">${dateStr}</div>
+  </div>
+</div>
+
+<div class="total-box">
+  <div class="total-score">${s.total}/10</div>
+  <div class="total-label">総合リスクスコア</div>
+</div>
+
+<div class="score-section">
+  <div style="font-weight:600;margin-bottom:10px;font-size:13px">【各リスク要因の詳細】</div>
+
+  <div class="score-item">
+    <div class="score-name">地震</div>
+    <div class="score-content">
+      <div class="score-score">${s.earthquake}/10</div>
+      <div class="score-expl">${escapeHtml(e.earthquake)}</div>
+    </div>
+  </div>
+
+  <div class="score-item">
+    <div class="score-name">水害</div>
+    <div class="score-content">
+      <div class="score-score">${s.flood}/10</div>
+      <div class="score-expl">${escapeHtml(e.flood)}</div>
+    </div>
+  </div>
+
+  <div class="score-item">
+    <div class="score-name">液状化</div>
+    <div class="score-content">
+      <div class="score-score">${s.liquefaction}/10</div>
+      <div class="score-expl">${escapeHtml(e.liquefaction)}</div>
+    </div>
+  </div>
+
+  <div class="score-item">
+    <div class="score-name">土砂</div>
+    <div class="score-content">
+      <div class="score-score">${s.sediment}/10</div>
+      <div class="score-expl">${escapeHtml(e.sediment)}</div>
+    </div>
+  </div>
+
+  <div class="score-item">
+    <div class="score-name">台風</div>
+    <div class="score-content">
+      <div class="score-score">${s.typhoon}/10</div>
+      <div class="score-expl">${escapeHtml(e.typhoon)}</div>
+    </div>
+  </div>
+
+  <div class="score-item">
+    <div class="score-name">津波・高潮</div>
+    <div class="score-content">
+      <div class="score-score">${s.coastal}/10</div>
+      <div class="score-expl">${escapeHtml(e.coastal)}</div>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  <div class="footer-brand">CocoHaza / ココハザード — 調査報告書</div>
+  <b>注記：</b><br>
+  • このレポートは CocoHaza（ここハザード）による自動生成の補助資料です<br>
+  • 正式な重要事項説明書（宅建業法第35条）の代替にはなりません<br>
+  • 各自治体の公式ハザードマップで必ず二次確認をしてください<br>
+  • 防災判断には専門家への相談をお勧めします
+  <div class="footer-copy-notice">
+    【著作権・使用制限】本ドキュメントは CocoHaza / ここハザードが生成したものです。
+    スコアデータ・分析結果の無断転用・改ざん・他サービスへの流用を禁じます。
+    © 2026 CocoHaza. All rights reserved.
+  </div>
+</div>
+
+</body></html>
+  `;
+
+  const opt = {
+    margin: 10,
+    filename: `${d.address.replace(/[\\/:*?"<>|]/g, '')}_CocoHaza_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}.pdf`,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2 },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+  };
+
+  html2pdf().set(opt).from(html).save();
+  showToast('PDFを生成しています...');
+}
+
+// ── オートコンプリート ────────────────────────────────
+let _acTimer = null;
+let _acIdx = -1;
+
+const _inp = document.getElementById('address-input');
+
+_inp.addEventListener('input', function() {
+  clearTimeout(_acTimer);
+  const val = this.value.trim();
+  if (val.length < 2) { _hideAc(); return; }
+  _acTimer = setTimeout(() => _fetchAc(val), 280);
+});
+
+_inp.addEventListener('keydown', function(e) {
+  const dd = document.getElementById('ac-dropdown');
+  const items = dd ? dd.querySelectorAll('.ac-item') : [];
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    _acIdx = Math.min(_acIdx + 1, items.length - 1);
+    items.forEach((el, i) => el.classList.toggle('active', i === _acIdx));
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    _acIdx = Math.max(_acIdx - 1, -1);
+    items.forEach((el, i) => el.classList.toggle('active', i === _acIdx));
+  } else if (e.key === 'Enter') {
+    if (_acIdx >= 0 && items[_acIdx]) {
+      items[_acIdx].click();
+    } else {
+      _hideAc();
+      search();
+    }
+  } else if (e.key === 'Escape') {
+    _hideAc();
+  }
+});
+
+async function _fetchAc(q) {
+  try {
+    const r = await fetch(
+      `https://msearch.gsi.go.jp/address-search/AddressSearch?q=${encodeURIComponent(q)}`
+    );
+    const data = await r.json();
+    _showAc(data.slice(0, 7));
+  } catch { _hideAc(); }
+}
+
+function _showAc(items) {
+  let dd = document.getElementById('ac-dropdown');
+  if (!dd) {
+    dd = document.createElement('div');
+    dd.id = 'ac-dropdown';
+    document.querySelector('.search-bar').appendChild(dd);
+  }
+  _acIdx = -1;
+  if (!items.length) { _hideAc(); return; }
+  dd.innerHTML = items.map(it => {
+    const title = (it.properties?.title || '').replace(/</g, '&lt;');
+    return `<div class="ac-item" tabindex="-1">${title}</div>`;
+  }).join('');
+  dd.querySelectorAll('.ac-item').forEach((el, i) => {
+    el.addEventListener('mousedown', e => {
+      e.preventDefault();
+      _inp.value = items[i].properties?.title || '';
+      _hideAc();
+      search();
+    });
+  });
+  dd.style.display = 'block';
+}
+
+function _hideAc() {
+  const dd = document.getElementById('ac-dropdown');
+  if (dd) dd.style.display = 'none';
+  _acIdx = -1;
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.search-bar')) _hideAc();
+});
+
+// ── 被災履歴データ（都道府県コード → 主な災害）────────────
+const DISASTER_DB = {
+  "01":[ {y:2018,t:"quake",n:"北海道胆振東部地震 M6.7",d:"震度7・土砂崩れで死者41名"},
+         {y:2016,t:"flood",n:"台風10号",d:"河川氾濫、北海道で甚大な浸水被害"} ],
+  "02":[ {y:2011,t:"quake",n:"東日本大震災（震度6弱）",d:"津波が三陸海岸に到達"},
+         {y:2022,t:"flood",n:"青森大雨",d:"浸水家屋多数"} ],
+  "03":[ {y:2011,t:"quake",n:"東日本大震災 M9.0",d:"沿岸部に最大40m超の津波、死者多数"},
+         {y:2019,t:"flood",n:"台風19号",d:"河川氾濫・浸水被害"} ],
+  "04":[ {y:2011,t:"quake",n:"東日本大震災 M9.0",d:"津波・仙台平野が広範囲浸水"},
+         {y:2019,t:"flood",n:"台風19号",d:"吉田川など複数河川が氾濫"} ],
+  "05":[ {y:2011,t:"quake",n:"東日本大震災（震度6強）",d:"液状化・建物被害"},
+         {y:2013,t:"flood",n:"秋田豪雨",d:"雄物川支流が氾濫"} ],
+  "06":[ {y:2014,t:"flood",n:"山形豪雨",d:"最上川流域で浸水被害"},
+         {y:2011,t:"quake",n:"東日本大震災（震度5強）",d:"建物・道路被害"} ],
+  "07":[ {y:2011,t:"quake",n:"東日本大震災 M9.0",d:"津波・沿岸部壊滅的被害"},
+         {y:2019,t:"flood",n:"台風19号",d:"阿武隈川氾濫、広域浸水"} ],
+  "08":[ {y:2015,t:"flood",n:"関東・東北豪雨",d:"鬼怒川が決壊、常総市が大規模浸水"},
+         {y:2011,t:"quake",n:"東日本大震災（震度6強）",d:"液状化・建物被害多数"} ],
+  "09":[ {y:2011,t:"quake",n:"東日本大震災（震度6強）",d:"建物被害・液状化"},
+         {y:2019,t:"flood",n:"台風19号",d:"思川・渡良瀬川流域で浸水"} ],
+  "10":[ {y:2019,t:"flood",n:"台風19号",d:"烏川流域で浸水被害"},
+         {y:2011,t:"quake",n:"東日本大震災（震度5強）",d:"建物・インフラ被害"} ],
+  "11":[ {y:2019,t:"flood",n:"台風19号",d:"荒川・越辺川等が氾濫危機"},
+         {y:2011,t:"quake",n:"東日本大震災（震度5強）",d:"液状化被害（浦和等）"} ],
+  "12":[ {y:2019,t:"typhoon",n:"台風15号（ファクサイ）",d:"最大瞬間風速57m、長期停電、農業被害"},
+         {y:2019,t:"flood",n:"台風19号",d:"養老川等が氾濫"} ],
+  "13":[ {y:2019,t:"flood",n:"台風19号",d:"多摩川氾濫、世田谷・狛江で浸水"},
+         {y:2011,t:"quake",n:"東日本大震災（震度5強）",d:"液状化（江東区・江戸川区）"} ],
+  "14":[ {y:2019,t:"flood",n:"台風19号",d:"鶴見川・相模川流域で浸水被害"},
+         {y:1923,t:"quake",n:"関東大震災 M7.9",d:"死者・行方不明者10万5千名超"} ],
+  "15":[ {y:2004,t:"quake",n:"新潟県中越地震 M6.8",d:"死者68名、山古志村孤立"},
+         {y:2011,t:"flood",n:"新潟・福島豪雨",d:"三条市など広域浸水"} ],
+  "16":[ {y:2018,t:"flood",n:"台風24号",d:"常願寺川流域で浸水"},
+         {y:2022,t:"flood",n:"令和4年大雨",d:"一級河川各所で氾濫危機"} ],
+  "17":[ {y:2023,t:"flood",n:"令和5年奥能登豪雨",d:"河川氾濫・土砂災害"},
+         {y:2024,t:"quake",n:"能登半島地震 M7.6",d:"死者・行方不明者多数、輪島朝市全焼"} ],
+  "18":[ {y:2004,t:"typhoon",n:"台風23号",d:"足羽川決壊、福井市街が浸水"},
+         {y:2018,t:"flood",n:"台風21号",d:"九頭竜川流域で浸水"} ],
+  "19":[ {y:2019,t:"flood",n:"台風19号",d:"千曲川支流で氾濫、浸水被害"},
+         {y:2014,t:"landslide",n:"長野神城断層地震 M6.7",d:"土砂崩れ・家屋倒壊"} ],
+  "20":[ {y:2019,t:"flood",n:"台風19号",d:"千曲川が長野市穂保地区で決壊"},
+         {y:1847,t:"flood",n:"善光寺地震・土砂崩れ",d:"犀川を堰き止め土石流"} ],
+  "21":[ {y:2000,t:"flood",n:"東海豪雨",d:"新川・庄内川流域で広域浸水"},
+         {y:1891,t:"quake",n:"濃尾地震 M8.0",d:"死者約7000名・日本最大の内陸地震"} ],
+  "22":[ {y:2022,t:"flood",n:"台風15号",d:"静岡市清水区で甚大な浸水・断水"},
+         {y:2009,t:"flood",n:"駿河湾沖地震",d:"震度6弱・土砂崩れ"} ],
+  "23":[ {y:2000,t:"flood",n:"東海豪雨",d:"名古屋市天白区等で甚大な浸水"},
+         {y:2000,t:"quake",n:"鳥取県西部地震（震度4）",d:"建物被害"} ],
+  "24":[ {y:2011,t:"typhoon",n:"台風12号",d:"紀伊半島豪雨、死者・行方不明者100名超"},
+         {y:2009,t:"flood",n:"台風9号",d:"宮川流域で氾濫"} ],
+  "25":[ {y:2013,t:"flood",n:"台風18号",d:"野洲川・草津川流域で浸水"},
+         {y:1995,t:"quake",n:"阪神淡路大震災（震度4）",d:"建物被害"} ],
+  "26":[ {y:2012,t:"flood",n:"京都豪雨",d:"鴨川流域・宇治川で浸水被害"},
+         {y:1995,t:"quake",n:"阪神淡路大震災（震度5強）",d:"建物被害多数"} ],
+  "27":[ {y:2018,t:"typhoon",n:"台風21号",d:"関空冠水・大阪市内で停電、死者14名"},
+         {y:2018,t:"quake",n:"大阪府北部地震 M6.1",d:"死者6名・ブロック塀倒壊が問題に"} ],
+  "28":[ {y:1995,t:"quake",n:"阪神淡路大震災 M7.3",d:"死者6434名・神戸市内が壊滅的被害"},
+         {y:2018,t:"flood",n:"西日本豪雨",d:"加古川流域で浸水"} ],
+  "29":[ {y:2011,t:"typhoon",n:"台風12号",d:"紀伊山地で土砂崩れ、死者・行方不明者多数"},
+         {y:1995,t:"quake",n:"阪神淡路大震災（震度4）",d:"建物被害"} ],
+  "30":[ {y:2011,t:"typhoon",n:"台風12号",d:"那智勝浦で土砂崩れ・河川氾濫、死者多数"},
+         {y:2019,t:"typhoon",n:"台風19号",d:"沿岸部で高波・浸水被害"} ],
+  "31":[ {y:2000,t:"quake",n:"鳥取県西部地震 M7.3",d:"死者0・液状化被害が注目された"},
+         {y:2010,t:"flood",n:"鳥取豪雨",d:"千代川流域で浸水"} ],
+  "32":[ {y:2018,t:"flood",n:"西日本豪雨",d:"高津川流域で浸水被害"},
+         {y:2004,t:"typhoon",n:"台風21号",d:"高波・強風被害"} ],
+  "33":[ {y:2018,t:"flood",n:"西日本豪雨",d:"高梁川水系・倉敷市真備地区が壊滅的浸水"},
+         {y:1946,t:"quake",n:"南海地震 M8.0",d:"津波・死者・行方不明者1400名超"} ],
+  "34":[ {y:2018,t:"flood",n:"西日本豪雨",d:"江の川・太田川流域で浸水・土砂崩れ死者多数"},
+         {y:2014,t:"landslide",n:"広島土砂災害",d:"安佐南・安佐北区で土石流、死者77名"} ],
+  "35":[ {y:2013,t:"flood",n:"山口豪雨",d:"島田川流域で浸水"},
+         {y:2018,t:"flood",n:"西日本豪雨",d:"錦川等で浸水・土砂被害"} ],
+  "36":[ {y:2004,t:"typhoon",n:"台風10・23号",d:"吉野川流域で氾濫"},
+         {y:2018,t:"flood",n:"西日本豪雨",d:"那賀川流域で浸水"} ],
+  "37":[ {y:2018,t:"flood",n:"西日本豪雨",d:"土器川流域で浸水被害"},
+         {y:1946,t:"quake",n:"南海地震 M8.0",d:"津波・沿岸部被害"} ],
+  "38":[ {y:2018,t:"flood",n:"西日本豪雨",d:"肱川が氾濫・大洲市・西予市で甚大被害"},
+         {y:1946,t:"quake",n:"南海地震 M8.0",d:"津波・高知との県境一帯被害"} ],
+  "39":[ {y:1998,t:"flood",n:"高知豪雨",d:"鏡川流域で浸水、24時間降水量日本最高記録"},
+         {y:1946,t:"quake",n:"南海地震 M8.0",d:"津波、高知市で広域浸水"} ],
+  "40":[ {y:2017,t:"flood",n:"九州北部豪雨",d:"朝倉市・東峰村で土石流、死者42名"},
+         {y:2023,t:"flood",n:"令和5年梅雨前線豪雨",d:"筑後川流域で浸水"} ],
+  "41":[ {y:2019,t:"typhoon",n:"台風17号",d:"武雄・多久で強風・浸水被害"},
+         {y:2017,t:"flood",n:"九州北部豪雨",d:"嘉瀬川流域で浸水"} ],
+  "42":[ {y:2019,t:"typhoon",n:"台風19号",d:"長崎市で強風・高波被害"},
+         {y:1982,t:"flood",n:"長崎大水害",d:"死者・行方不明者299名"} ],
+  "43":[ {y:2016,t:"quake",n:"熊本地震 M7.3",d:"死者273名・益城町などで甚大な建物被害"},
+         {y:2020,t:"flood",n:"令和2年7月豪雨",d:"球磨川が氾濫、人吉市が壊滅的浸水"} ],
+  "44":[ {y:2017,t:"flood",n:"九州北部豪雨",d:"大分市・日田市で浸水・土砂被害"},
+         {y:1975,t:"quake",n:"大分地震 M6.4",d:"別府・大分市で被害"} ],
+  "45":[ {y:2005,t:"typhoon",n:"台風14号",d:"大淀川氾濫、県内全域で甚大被害"},
+         {y:2010,t:"flood",n:"宮崎豪雨",d:"一ツ瀬川流域で浸水"} ],
+  "46":[ {y:1993,t:"typhoon",n:"台風13号",d:"死者45名・農業に甚大被害"},
+         {y:2022,t:"flood",n:"令和4年8月豪雨",d:"大隅半島で土砂・浸水"} ],
+  "47":[ {y:2023,t:"typhoon",n:"台風6号",d:"長期停電、暴風雨による農業・観光被害"},
+         {y:2022,t:"typhoon",n:"台風11号",d:"全県で暴風・高波警報"} ],
+};
+
+const DISASTER_TYPE_LABEL = {
+  flood: { label: "洪水", cls: "badge-flood" },
+  quake: { label: "地震", cls: "badge-quake" },
+  typhoon: { label: "台風", cls: "badge-typhoon" },
+  landslide: { label: "土砂", cls: "badge-landslide" },
+};
+
+function disasterHistoryHTML(prefCode) {
+  const events = DISASTER_DB[prefCode] || [];
+  if (!events.length) return '';
+  const rows = events.map(ev => {
+    const { label, cls } = DISASTER_TYPE_LABEL[ev.t] || { label: ev.t, cls: "" };
+    return `<div class="disaster-item">
+      <span class="disaster-badge ${cls}">${label}</span>
+      <div class="disaster-text"><strong>${ev.n}</strong><br>${ev.d}</div>
+      <div class="disaster-year">${ev.y}年</div>
+    </div>`;
+  }).join('');
+  return `<div class="disaster-history">
+    <h4>📚 この地域の主な被災履歴</h4>
+    ${rows}
+  </div>`;
+}
+
+// ── 初期化：お気に入り表示 + URLパラメータ自動検索 ───────
+renderFavSection();
+(function() {
+  const addr = new URLSearchParams(window.location.search).get('address');
+  if (addr) {
+    document.getElementById('address-input').value = addr;
+    search();
+  }
+})();
+</script>
+</body>
+</html>

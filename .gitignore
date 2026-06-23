@@ -1,0 +1,6 @@
+.env
+__pycache__/
+*.pyc
+# flood データは大きすぎるため除外（236MB）→ Cloudflare R2 から取得
+data/flood_*.json
+/tmp/

@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CocoHaza / ココハザード - 30秒でわかる地域のリスク</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+       background: #0d0d0d; color: #fff; overflow-x: hidden; }
+
+/* ── NAV ─────────────────────────────────────────────────── */
+nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: rgba(13,13,13,.85); backdrop-filter: blur(12px);
+      padding: 0 40px; height: 64px; display: flex; align-items: center;
+      justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,.07); }
+
+.nav-logo { font-size: 1.05rem; font-weight: 700; letter-spacing: .05em;
+            color: #fff; text-decoration: none; }
+
+.nav-links { display: flex; gap: 32px; align-items: center; }
+.nav-links a { color: rgba(255,255,255,.6); text-decoration: none; font-size: .88rem;
+               transition: color .2s; }
+.nav-links a:hover { color: #fff; }
+.nav-cta { background: #fff; color: #0d0d0d !important; padding: 8px 20px;
+           border-radius: 6px; font-weight: 600 !important; }
+.nav-cta:hover { background: #e5e7eb !important; color: #0d0d0d !important; }
+
+/* ── HERO ────────────────────────────────────────────────── */
+.hero { min-height: 100vh; position: relative; display: flex;
+        align-items: flex-end; padding: 0 80px 100px; overflow: hidden; }
+
+.hero-bg { position: absolute; inset: 0;
+           background-image: url('/assets/images/Gemini_Generated_Image_5050h5050h5050h5.png');
+           background-size: cover; background-position: center;
+           filter: brightness(.55); }
+
+.hero-content { position: relative; z-index: 1; max-width: 720px; }
+
+.hero-eyebrow { font-size: .78rem; font-weight: 600; letter-spacing: .18em;
+                text-transform: uppercase; color: rgba(255,255,255,.55);
+                margin-bottom: 20px; }
+
+.hero h1 { font-size: clamp(2.8rem, 6vw, 5rem); font-weight: 900;
+           line-height: 1.1; letter-spacing: -.02em; color: #fff;
+           margin-bottom: 28px; }
+
+.hero p { font-size: 1.1rem; color: rgba(255,255,255,.7); line-height: 1.7;
+          max-width: 520px; margin-bottom: 44px; }
+
+.hero-btns { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+
+.btn-primary { display: inline-block; padding: 14px 32px; background: #fff;
+               color: #0d0d0d; border-radius: 6px; font-size: .95rem; font-weight: 700;
+               text-decoration: none; transition: all .2s; }
+.btn-primary:hover { background: #e5e7eb; }
+
+.btn-secondary { display: inline-block; padding: 14px 32px;
+                 border: 1px solid rgba(255,255,255,.4); color: #fff;
+                 border-radius: 6px; font-size: .95rem; font-weight: 500;
+                 text-decoration: none; transition: all .2s; }
+.btn-secondary:hover { border-color: #fff; background: rgba(255,255,255,.08); }
+
+/* ── STATS ───────────────────────────────────────────────── */
+.stats { background: #161616; border-top: 1px solid rgba(255,255,255,.06);
+         padding: 60px 80px; }
+
+.stats-inner { max-width: 1100px; margin: 0 auto;
+               display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; }
+
+.stat-item { border-left: 2px solid rgba(255,255,255,.1); padding-left: 28px; }
+
+.stat-num { font-size: 3.5rem; font-weight: 900; color: #fff; line-height: 1;
+            letter-spacing: -.03em; margin-bottom: 8px; }
+
+.stat-label { font-size: .82rem; color: rgba(255,255,255,.45);
+              letter-spacing: .05em; line-height: 1.5; }
+
+/* ── PERSONAS ─────────────────────────────────────────────── */
+.personas { padding: 120px 80px; background: #f0ebe3; }
+
+.section-eyebrow { font-size: .72rem; font-weight: 700; letter-spacing: .18em;
+                   text-transform: uppercase; color: rgba(13,13,13,.4);
+                   margin-bottom: 16px; }
+
+.section-title { font-size: clamp(2rem, 4vw, 3rem); font-weight: 900;
+                 color: #0d0d0d; margin-bottom: 64px; line-height: 1.15;
+                 letter-spacing: -.02em; }
+
+.personas-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+                 gap: 2px; max-width: 1100px; }
+
+.persona-card { background: #fff; padding: 48px 40px; border: 1px solid #e5e0d8;
+                transition: all .25s; cursor: pointer; }
+
+.persona-card:hover { background: #0d0d0d; }
+.persona-card:hover h3, .persona-card:hover p { color: #fff; }
+.persona-card:hover .persona-benefit { background: rgba(255,255,255,.1); color: rgba(255,255,255,.7); }
+
+.persona-num { font-size: .72rem; font-weight: 600; letter-spacing: .12em;
+               color: rgba(13,13,13,.3); margin-bottom: 28px; }
+
+.persona-card h3 { font-size: 1.4rem; font-weight: 800; color: #0d0d0d;
+                   margin-bottom: 14px; transition: color .25s; }
+
+.persona-card p { font-size: .92rem; color: #6b7280; line-height: 1.7;
+                  margin-bottom: 28px; transition: color .25s; }
+
+.persona-benefit { display: inline-block; background: #f0ebe3; padding: 6px 14px;
+                   border-radius: 4px; font-size: .78rem; font-weight: 700;
+                   color: #0d0d0d; letter-spacing: .04em; transition: all .25s; }
+
+/* ── FEATURES ─────────────────────────────────────────────── */
+.features { position: relative; padding: 120px 80px; overflow: hidden; }
+
+.features-bg { position: absolute; inset: 0;
+               background-image: url('/assets/images/Gemini_Generated_Image_wpm042wpm042wpm0.png');
+               background-size: cover; background-position: center;
+               filter: brightness(.3); }
+
+.features-inner { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; }
+
+.features-header { margin-bottom: 64px; }
+
+.features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 2px; }
+
+.feature-item { background: rgba(255,255,255,.06); backdrop-filter: blur(4px);
+                border: 1px solid rgba(255,255,255,.08); padding: 36px 32px;
+                transition: background .25s; }
+
+.feature-item:hover { background: rgba(255,255,255,.12); }
+
+.feature-icon { font-size: 1.8rem; margin-bottom: 18px; }
+
+.feature-item h4 { font-size: 1rem; font-weight: 700; color: #fff;
+                   margin-bottom: 10px; }
+
+.feature-item p { font-size: .87rem; color: rgba(255,255,255,.55); line-height: 1.65; }
+
+/* ── DATA SOURCES ─────────────────────────────────────────── */
+.data-sources { position: relative; padding: 120px 80px; overflow: hidden; }
+
+.data-sources-bg { position: absolute; inset: 0;
+                   background-image: url('/assets/images/Gemini_Generated_Image_9aze419aze419aze.png');
+                   background-size: cover; background-position: center;
+                   filter: brightness(.22); }
+
+.data-sources-inner { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; }
+
+.sources-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+                gap: 2px; margin-top: 64px; }
+
+.source-badge { background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1);
+                padding: 28px 24px; text-align: left;
+                transition: background .25s; }
+
+.source-badge:hover { background: rgba(255,255,255,.12); }
+
+.source-badge .src-icon { font-size: 1.5rem; margin-bottom: 14px; }
+
+.source-badge .src-name { font-size: .88rem; font-weight: 700; color: #fff;
+                           margin-bottom: 4px; }
+
+.source-badge .src-sub { font-size: .75rem; color: rgba(255,255,255,.4); }
+
+/* ── HOW IT WORKS ─────────────────────────────────────────── */
+.how-it-works { background: #f0ebe3; padding: 120px 80px; }
+
+.steps { max-width: 1100px; display: grid;
+         grid-template-columns: repeat(3, 1fr); gap: 2px; margin-top: 64px; }
+
+.step { background: #fff; padding: 48px 40px; border: 1px solid #e5e0d8; }
+
+.step-num { font-size: 4rem; font-weight: 900; color: rgba(13,13,13,.08);
+            line-height: 1; margin-bottom: 24px; letter-spacing: -.04em; }
+
+.step h4 { font-size: 1.1rem; font-weight: 800; color: #0d0d0d; margin-bottom: 12px; }
+
+.step p { font-size: .9rem; color: #6b7280; line-height: 1.65; }
+
+/* ── FAQ ────────────────────────────────────────────────────── */
+.faq { background: #161616; padding: 120px 80px; }
+
+.faq-inner { max-width: 800px; margin: 0 auto; }
+
+.faq-item { border-bottom: 1px solid rgba(255,255,255,.08); padding: 28px 0; }
+
+.faq-q { font-size: 1rem; font-weight: 700; color: #fff;
+          margin-bottom: 10px; cursor: pointer; }
+
+.faq-a { font-size: .9rem; color: rgba(255,255,255,.5); line-height: 1.75; }
+
+/* ── CTA ────────────────────────────────────────────────────── */
+.cta-section { background: #0d0d0d; padding: 140px 80px; text-align: center;
+               border-top: 1px solid rgba(255,255,255,.06); }
+
+.cta-section h2 { font-size: clamp(2.5rem, 5vw, 4rem); font-weight: 900;
+                  color: #fff; margin-bottom: 24px; letter-spacing: -.02em; }
+
+.cta-section p { font-size: 1.05rem; color: rgba(255,255,255,.5);
+                 margin-bottom: 48px; }
+
+/* ── FOOTER ────────────────────────────────────────────────── */
+footer { background: #0d0d0d; border-top: 1px solid rgba(255,255,255,.06);
+         padding: 36px 80px; display: flex; align-items: center;
+         justify-content: space-between; flex-wrap: wrap; gap: 16px; }
+
+.footer-copy { font-size: .78rem; color: rgba(255,255,255,.25); }
+
+.footer-links { display: flex; gap: 24px; }
+.footer-links a { font-size: .78rem; color: rgba(255,255,255,.35);
+                  text-decoration: none; transition: color .2s; }
+.footer-links a:hover { color: rgba(255,255,255,.8); }
+
+/* ── RESPONSIVE ────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  nav { padding: 0 20px; }
+  .nav-links { display: none; }
+
+  .hero { padding: 0 24px 72px; }
+  .hero h1 { font-size: 2.4rem; }
+
+  .stats { padding: 48px 24px; }
+  .stats-inner { grid-template-columns: 1fr; gap: 28px; }
+
+  .personas { padding: 80px 24px; }
+  .features { padding: 80px 24px; }
+  .data-sources { padding: 80px 24px; }
+  .how-it-works { padding: 80px 24px; }
+  .faq { padding: 80px 24px; }
+  .cta-section { padding: 80px 24px; }
+
+  .steps { grid-template-columns: 1fr; }
+
+  footer { padding: 32px 24px; flex-direction: column; align-items: flex-start; }
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="/" class="nav-logo">CocoHaza / ここハザード</a>
+  <div class="nav-links">
+    <a href="/methodology.html">スコア算出方法</a>
+    <a href="/terms.html">利用規約</a>
+    <a href="/index.html" class="nav-cta">無料で試す</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-content">
+    <p class="hero-eyebrow">Japan Disaster Risk Score</p>
+    <h1>あなたの街の<br>リスクが、<br>すぐわかる。</h1>
+    <p>住所を入力するだけで、地震・洪水・台風・津波など<br>
+    6つの災害リスクを政府公式データから集計・可視化。</p>
+    <div class="hero-btns">
+      <a href="/index.html" class="btn-primary">今すぐ無料で試す</a>
+      <a href="/methodology.html" class="btn-secondary">スコアの仕組みを見る</a>
+    </div>
+  </div>
+</section>
+
+<!-- STATS -->
+<section class="stats">
+  <div class="stats-inner">
+    <div class="stat-item">
+      <div class="stat-num">6</div>
+      <div class="stat-label">分析する<br>災害カテゴリ</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-num">30秒</div>
+      <div class="stat-label">住所入力から<br>スコア表示まで</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-num">5+</div>
+      <div class="stat-label">利用している<br>公式データソース</div>
+    </div>
+  </div>
+</section>
+
+<!-- PERSONAS -->
+<section class="personas">
+  <p class="section-eyebrow">Who It's For</p>
+  <h2 class="section-title">不動産業者から<br>個人まで。</h2>
+
+  <div class="personas-grid">
+    <div class="persona-card">
+      <div class="persona-num">01</div>
+      <h3>個人ユーザー</h3>
+      <p>引越し・住宅購入前に、物件の防災リスクを一瞬で確認。家族の安全を守る判断材料に。</p>
+      <span class="persona-benefit">30秒で判断可能</span>
+    </div>
+
+    <div class="persona-card">
+      <div class="persona-num">02</div>
+      <h3>不動産業者</h3>
+      <p>重要事項説明に必要なハザード情報を一画面で確認。複数物件の比較・PDF出力もワンクリック。</p>
+      <span class="persona-benefit">ハザード確認を効率化</span>
+    </div>
+
+    <div class="persona-card">
+      <div class="persona-num">03</div>
+      <h3>教育機関</h3>
+      <p>防災授業で生徒が自分の街のリスクを可視化。データで学ぶ地域防災の実践的な教材に。</p>
+      <span class="persona-benefit">地理・防災の教材に</span>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="features">
+  <div class="features-bg"></div>
+  <div class="features-inner">
+    <div class="features-header">
+      <p class="section-eyebrow" style="color:rgba(255,255,255,.4)">What We Analyze</p>
+      <h2 class="section-title" style="color:#fff; margin-bottom:0">6つの災害リスクを<br>同時に分析</h2>
+    </div>
+
+    <div class="features-grid">
+      <div class="feature-item">
+        <div class="feature-icon">🏔️</div>
+        <h4>地震リスク</h4>
+        <p>防災科研 J-SHIS の30年確率データから震度6弱以上の発生確率を算出。</p>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon">🌊</div>
+        <h4>洪水リスク</h4>
+        <p>国土交通省 A31 洪水浸水想定区域ポリゴンデータで浸水深を特定。</p>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon">💧</div>
+        <h4>液状化リスク</h4>
+        <p>産総研シームレス地質図から地盤の液状化しやすさを推定。</p>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon">⛰️</div>
+        <h4>土砂災害リスク</h4>
+        <p>A33 土砂災害警戒区域 + 国土地理院標高APIで傾斜角を算出。</p>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon">🌀</div>
+        <h4>台風リスク</h4>
+        <p>気象庁 過去70年間の台風統計から都道府県別の通過頻度を反映。</p>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon">🌏</div>
+        <h4>津波・高潮リスク</h4>
+        <p>A40 津波浸水想定区域ポリゴン + 標高データで沿岸リスクを評価。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- DATA SOURCES -->
+<section class="data-sources">
+  <div class="data-sources-bg"></div>
+  <div class="data-sources-inner">
+    <p class="section-eyebrow" style="color:rgba(255,255,255,.4)">Data Sources</p>
+    <h2 class="section-title" style="color:#fff; margin-bottom:0">すべて政府公式<br>データを使用</h2>
+
+    <div class="sources-grid">
+      <div class="source-badge">
+        <div class="src-icon">🏛️</div>
+        <div class="src-name">防災科研</div>
+        <div class="src-sub">J-SHIS 地震動予測地図</div>
+      </div>
+      <div class="source-badge">
+        <div class="src-icon">🗺️</div>
+        <div class="src-name">国土交通省</div>
+        <div class="src-sub">国土数値情報 A31/A33/A40/A51</div>
+      </div>
+      <div class="source-badge">
+        <div class="src-icon">🪨</div>
+        <div class="src-name">産総研</div>
+        <div class="src-sub">シームレス地質図</div>
+      </div>
+      <div class="source-badge">
+        <div class="src-icon">🌡️</div>
+        <div class="src-name">気象庁</div>
+        <div class="src-sub">台風統計資料</div>
+      </div>
+      <div class="source-badge">
+        <div class="src-icon">🏔️</div>
+        <div class="src-name">国土地理院</div>
+        <div class="src-sub">標高API・逆ジオコーダ</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="how-it-works">
+  <p class="section-eyebrow">How It Works</p>
+  <h2 class="section-title">使い方は<br>シンプルに3ステップ</h2>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <h4>住所を入力</h4>
+      <p>「東京都江東区豊洲3丁目」など、番地レベルで入力。オートコンプリートで素早く。</p>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <h4>公式データを自動集計</h4>
+      <p>防災科研・国土交通省など5つの政府データソースを自動取得。6つのリスクスコアを算出。</p>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <h4>結果を活用</h4>
+      <p>PDFで保管、共有、重説作成の補助資料に。地図上での比較・お気に入り機能も。</p>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="faq">
+  <div class="faq-inner">
+    <p class="section-eyebrow" style="color:rgba(255,255,255,.3)">FAQ</p>
+    <h2 class="section-title" style="color:#fff; margin-bottom: 48px">よくある質問</h2>
+
+    <div class="faq-item">
+      <div class="faq-q">Q. このツールは正式な重要事項説明書ですか？</div>
+      <div class="faq-a">いいえ。補助資料です。不動産業者は最終確認を必ず各自治体の公式ハザードマップで行ってください。</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">Q. いつから有料になりますか？</div>
+      <div class="faq-a">現在は完全無料です。今後、不動産業者向けの有料プランを検討していますが、個人利用は基本無料を継続します。</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">Q. データはどのくらい古いですか？</div>
+      <div class="faq-a">J-SHISは2020年版、国土数値情報は2022年版を使用しています。気候変動による将来リスクは現時点では未反映です。</div>
+    </div>
+    <div class="faq-item">
+      <div class="faq-q">Q. 個人情報は保存されますか？</div>
+      <div class="faq-a">いいえ。入力した住所はリクエスト処理後に即座に削除します。アクセスログのみ最大30日間保管後、自動削除します。</div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section" id="app">
+  <h2>まず、無料で試してみる。</h2>
+  <p>ユーザー登録不要。物件の住所を入力するだけ。<br>
+  重要事項説明の補助資料として今日から使える。</p>
+  <a href="/index.html" class="btn-primary" style="font-size:1.05rem; padding: 16px 44px;">アプリを開く →</a>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-copy">© 2026 CocoHaza / ココハザード</div>
+  <div class="footer-links">
+    <a href="/methodology.html">スコア算出方法</a>
+    <a href="/terms.html">利用規約</a>
+    <a href="/">トップに戻る</a>
+  </div>
+</footer>
+
+</body>
+</html>

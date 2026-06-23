@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>スコアの算出方法 | CocoHaza / ココハザード</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+       background: #f5f5f5; color: #222; line-height: 1.7; }
+
+header { background: #1a1a2e; color: #fff; padding: 16px 24px;
+         display: flex; align-items: center; justify-content: space-between; }
+header h1 { font-size: 1.2rem; font-weight: 700; }
+header a  { color: #aaa; font-size: .85rem; text-decoration: none; }
+header a:hover { color: #fff; }
+
+.container { max-width: 860px; margin: 40px auto; padding: 0 20px 80px; }
+
+h2 { font-size: 1.3rem; font-weight: 700; color: #1a1a2e;
+     margin: 40px 0 16px; padding-bottom: 8px;
+     border-bottom: 2px solid #e74c3c; }
+h3 { font-size: 1rem; font-weight: 700; color: #333; margin: 24px 0 10px; }
+p  { font-size: .92rem; color: #444; margin-bottom: 12px; }
+ul { padding-left: 1.4em; margin-bottom: 12px; }
+li { font-size: .92rem; color: #444; margin-bottom: 4px; }
+
+/* 総合スコア式 */
+.formula-box { background: #1a1a2e; color: #fff; border-radius: 10px;
+               padding: 20px 24px; margin: 16px 0; font-family: monospace; }
+.formula-box .title { font-size: .75rem; color: #aaa; margin-bottom: 10px;
+                      text-transform: uppercase; letter-spacing: .1em; }
+.formula-line { font-size: .95rem; line-height: 2; }
+.formula-line span { color: #e74c3c; font-weight: 700; }
+
+/* データソーステーブル */
+.source-grid { display: grid; gap: 14px; margin: 16px 0; }
+.source-card { background: #fff; border-radius: 8px; padding: 16px 18px;
+               box-shadow: 0 1px 4px rgba(0,0,0,.06); border-left: 4px solid; }
+.source-card.eq      { border-color: #e74c3c; }
+.source-card.liq     { border-color: #e67e22; }
+.source-card.flood   { border-color: #3498db; }
+.source-card.sed     { border-color: #8e44ad; }
+.source-card.typhoon { border-color: #27ae60; }
+.source-card.coastal { border-color: #16a085; }
+
+.source-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.source-badge  { font-size: .72rem; font-weight: 700; padding: 2px 8px;
+                 border-radius: 4px; color: #fff; white-space: nowrap; }
+.badge-eq      { background: #e74c3c; }
+.badge-liq     { background: #e67e22; }
+.badge-flood   { background: #3498db; }
+.badge-sed     { background: #8e44ad; }
+.badge-typhoon { background: #27ae60; }
+.badge-coastal { background: #16a085; }
+
+.source-name   { font-weight: 700; font-size: .95rem; }
+.source-weight { margin-left: auto; font-size: .8rem; color: #999; }
+.source-body   { font-size: .85rem; color: #555; }
+.source-body dt { font-weight: 600; color: #333; margin-top: 6px; }
+.source-body dd { margin-left: 1em; color: #666; }
+.source-body a  { color: #3498db; text-decoration: none; }
+.source-body a:hover { text-decoration: underline; }
+
+/* スコア変換表 */
+.score-table { width: 100%; border-collapse: collapse; font-size: .88rem;
+               margin: 12px 0; background: #fff; border-radius: 8px; overflow: hidden;
+               box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+.score-table th { background: #1a1a2e; color: #fff; padding: 8px 12px;
+                  text-align: left; font-weight: 600; font-size: .8rem; }
+.score-table td { padding: 8px 12px; border-bottom: 1px solid #f0f0f0; }
+.score-table tr:last-child td { border-bottom: none; }
+.s1,.s2 { color: #27ae60; font-weight: 700; }
+.s3,.s4 { color: #2ecc71; font-weight: 700; }
+.s5,.s6 { color: #f39c12; font-weight: 700; }
+.s7,.s8 { color: #e67e22; font-weight: 700; }
+.s9,.s10 { color: #e74c3c; font-weight: 700; }
+
+/* 注意事項 */
+.caution-box { background: #fff8f0; border: 1px solid #e67e22; border-radius: 8px;
+               padding: 16px 18px; margin: 16px 0; }
+.caution-box h4 { color: #e67e22; font-size: .9rem; margin-bottom: 8px; }
+.caution-box li { font-size: .88rem; color: #555; margin-bottom: 6px; }
+
+/* 更新情報 */
+.update-table { width: 100%; border-collapse: collapse; font-size: .88rem;
+                margin: 12px 0; }
+.update-table th { text-align: left; color: #888; font-weight: 400;
+                   padding: 6px 10px; border-bottom: 1px solid #eee; font-size: .8rem; }
+.update-table td { padding: 6px 10px; border-bottom: 1px solid #f5f5f5; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>CocoHaza / ココハザード — スコアの算出方法</h1>
+  <a href="/">← トップに戻る</a>
+</header>
+
+<div class="container">
+
+  <h2>1. 総合スコアの計算式</h2>
+  <p>6つのリスク要因を独立に算出し、重み付き平均で総合スコア（1〜10）を算出します。</p>
+
+  <div class="formula-box">
+    <div class="title">総合リスクスコア（1〜10）</div>
+    <div class="formula-line">
+      総合 ＝ 地震 × <span>0.25</span>
+            ＋ 水害 × <span>0.25</span>
+            ＋ 台風 × <span>0.15</span>
+            ＋ 津波・高潮 × <span>0.15</span>
+            ＋ 液状化 × <span>0.10</span>
+            ＋ 土砂 × <span>0.10</span>
+    </div>
+  </div>
+
+  <table class="score-table">
+    <tr><th>スコア</th><th>リスクレベル</th><th>目安</th></tr>
+    <tr><td class="s1">1〜2</td><td>低リスク</td><td>過去の大規模災害記録なし、地形的に安定</td></tr>
+    <tr><td class="s3">3〜4</td><td>やや低リスク</td><td>一部リスク要因あり、被害は限定的</td></tr>
+    <tr><td class="s5">5〜6</td><td>中程度のリスク</td><td>複数のリスク要因が重なる</td></tr>
+    <tr><td class="s7">7〜8</td><td>高リスク</td><td>大規模災害の浸水想定区域など</td></tr>
+    <tr><td class="s9">9〜10</td><td>非常に高リスク</td><td>複数の重大リスクが重複</td></tr>
+  </table>
+
+
+  <h2>2. 各スコアのデータソース</h2>
+
+  <div class="source-grid">
+
+    <!-- 地震 -->
+    <div class="source-card eq">
+      <div class="source-header">
+        <span class="source-badge badge-eq">地震</span>
+        <span class="source-name">地震動予測スコア</span>
+        <span class="source-weight">重み 25%</span>
+      </div>
+      <dl class="source-body">
+        <dt>データ提供元</dt>
+        <dd><a href="https://www.j-shis.bosai.go.jp/" target="_blank">J-SHIS 地震ハザードステーション（防災科学技術研究所）</a></dd>
+        <dt>使用データ</dt>
+        <dd>全国地震動予測地図 2020年版 — 250mメッシュ単位で「今後30年以内に震度6弱以上の揺れが発生する確率」を提供</dd>
+        <dt>スコア変換</dt>
+        <dd>確率26%以上→10、6〜26%→1〜10に線形変換、6%未満→1</dd>
+        <dt>更新頻度</dt>
+        <dd>概ね5年ごと（現在は2020年版を使用）</dd>
+      </dl>
+    </div>
+
+    <!-- 水害 -->
+    <div class="source-card flood">
+      <div class="source-header">
+        <span class="source-badge badge-flood">水害</span>
+        <span class="source-name">洪水浸水想定スコア</span>
+        <span class="source-weight">重み 25%</span>
+      </div>
+      <dl class="source-body">
+        <dt>データ提供元（東京エリア）</dt>
+        <dd><a href="https://nlftp.mlit.go.jp/ksj/gml/datalist/KsjTmplt-A31-v4_0.html" target="_blank">国土数値情報 A31 洪水浸水想定区域（国土交通省）</a></dd>
+        <dt>使用データ</dt>
+        <dd>想定最大規模（1000年に1度の降雨）の浸水深ポリゴン。kubun10（洪水予報河川）＋ kubun20（水位周知河川等）を使用。Shapely STRtree でポイントインポリゴン判定。</dd>
+        <dt>スコア変換（浸水深ランク）</dt>
+        <dd>浸水想定区域外→1、0〜0.5m→2、0.5〜3m→4、3〜5m→6、5〜10m→8、10〜20m→9、20m超→10</dd>
+        <dt>カバレッジ</dt>
+        <dd>現在は東京エリア（1次メッシュ 5339）のみ。それ以外は下記フォールバックを使用。</dd>
+        <dt>データ提供元（その他エリア）</dt>
+        <dd><a href="https://gbank.gsj.jp/seamless/" target="_blank">産総研 シームレス地質図 V2（産業技術総合研究所）</a> — 地質区分から水害リスクを推定</dd>
+        <dt>更新頻度</dt>
+        <dd>国土数値情報は随時更新（2022年版使用）、産総研は不定期</dd>
+      </dl>
+    </div>
+
+    <!-- 台風 -->
+    <div class="source-card typhoon">
+      <div class="source-header">
+        <span class="source-badge badge-typhoon">台風</span>
+        <span class="source-name">台風リスクスコア</span>
+        <span class="source-weight">重み 15%</span>
+      </div>
+      <dl class="source-body">
+        <dt>データ提供元</dt>
+        <dd><a href="https://www.data.jma.go.jp/yoho/typhoon/statistics/index.html" target="_blank">気象庁 台風の統計資料</a></dd>
+        <dt>使用データ</dt>
+        <dd>過去70年（1951〜2020年）の都道府県別台風接近・上陸頻度をもとに1〜10のスコアを設定。住所の都道府県コードで参照。</dd>
+        <dt>スコア例</dt>
+        <dd>沖縄→10、鹿児島→9、宮崎→8、北海道→2</dd>
+        <dt>更新頻度</dt>
+        <dd>現在は静的テーブル。今後は気象庁データから自動更新予定。</dd>
+      </dl>
+    </div>
+
+    <!-- 津波・高潮 -->
+    <div class="source-card coastal">
+      <div class="source-header">
+        <span class="source-badge badge-coastal">津波・高潮</span>
+        <span class="source-name">沿岸リスクスコア</span>
+        <span class="source-weight">重み 15%</span>
+      </div>
+      <dl class="source-body">
+        <dt>データ提供元</dt>
+        <dd>
+          <a href="https://maps.gsi.go.jp/development/elevation.html" target="_blank">国土地理院 標高API</a>、
+          <a href="https://gbank.gsj.jp/seamless/" target="_blank">産総研 シームレス地質図</a>
+        </dd>
+        <dt>使用データ</dt>
+        <dd>対象地点の標高（国土地理院）と地質区分（産総研）を組み合わせて算出。海岸低地・三角州など海岸性地質で低標高の地点を高リスクと判定。内陸の谷底低地は補正して過大評価を防ぐ。</dd>
+        <dt>スコア変換（標高ベース）</dt>
+        <dd>標高2m以下→9、5m以下→7、10m以下→5、20m以下→3、20m超→1 に地質補正を加算</dd>
+        <dt>更新頻度</dt>
+        <dd>APIリアルタイム参照</dd>
+      </dl>
+    </div>
+
+    <!-- 液状化 -->
+    <div class="source-card liq">
+      <div class="source-header">
+        <span class="source-badge badge-liq">液状化</span>
+        <span class="source-name">液状化リスクスコア</span>
+        <span class="source-weight">重み 10%</span>
+      </div>
+      <dl class="source-body">
+        <dt>データ提供元</dt>
+        <dd><a href="https://gbank.gsj.jp/seamless/" target="_blank">産総研 シームレス地質図 V2</a></dd>
+        <dt>使用データ</dt>
+        <dd>地質区分から液状化危険度を推定。埋立地・干拓地・盛り土など人工地盤や砂質地盤ほど高スコア。</dd>
+        <dt>スコア例</dt>
+        <dd>埋立地・干拓地→9、盛り土・砂州→8、後背湿地→7、山地・岩盤→1</dd>
+        <dt>更新頻度</dt>
+        <dd>APIリアルタイム参照</dd>
+      </dl>
+    </div>
+
+    <!-- 土砂 -->
+    <div class="source-card sed">
+      <div class="source-header">
+        <span class="source-badge badge-sed">土砂</span>
+        <span class="source-name">土砂災害スコア</span>
+        <span class="source-weight">重み 10%</span>
+      </div>
+      <dl class="source-body">
+        <dt>データ提供元</dt>
+        <dd><a href="https://maps.gsi.go.jp/development/elevation.html" target="_blank">国土地理院 標高API</a></dd>
+        <dt>使用データ</dt>
+        <dd>対象地点を中心に半径200m（上下左右4点）の標高を取得し、最大傾斜角を算出。傾斜が急なほど土砂災害リスクが高いと判定。</dd>
+        <dt>スコア変換（傾斜角）</dt>
+        <dd>30°以上→9、15〜30°→7、8〜15°→5、3〜8°→3、3°未満→1</dd>
+        <dt>更新頻度</dt>
+        <dd>APIリアルタイム参照</dd>
+      </dl>
+    </div>
+
+  </div><!-- /source-grid -->
+
+
+  <h2>3. 精度と限界事項</h2>
+
+  <div class="caution-box">
+    <h4>⚠️ 本スコアを使用する際の注意事項</h4>
+    <ul>
+      <li><strong>住所（丁目）レベルの精度：</strong>個別の建物・敷地単位ではなく、住所ジオコーディングで得られた代表点（丁目の中心付近）の情報です。同じ丁目内でも標高や地質が異なる場合があります。</li>
+      <li><strong>洪水スコアのカバレッジ：</strong>東京エリア（1次メッシュ 5339）のみ実データ。それ以外は地質による推定です。推定の場合、根拠テキストに「地質区分」と表示されます。</li>
+      <li><strong>豊洲などの沿岸埋立地：</strong>A31は河川洪水専用データのため、高潮・内部水路由来の浸水リスクは水害スコアではなく津波・高潮スコアに反映されています。</li>
+      <li><strong>データの鮮度：</strong>気候変動による将来リスクの変化は反映していません。地震確率は2020年版、洪水ポリゴンは2022年版を使用しています。</li>
+      <li><strong>防災判断には公式ハザードマップを：</strong>本スコアはリスクの目安です。避難計画や住宅取得の意思決定には、各自治体の公式ハザードマップを必ず参照してください。</li>
+    </ul>
+  </div>
+
+
+  <h2>4. データ更新情報</h2>
+
+  <table class="update-table">
+    <tr>
+      <th>スコア要因</th>
+      <th>データソース</th>
+      <th>使用バージョン</th>
+      <th>次回更新予定</th>
+    </tr>
+    <tr>
+      <td>地震</td>
+      <td>J-SHIS 全国地震動予測地図</td>
+      <td>2020年版</td>
+      <td>2025年版公開次第</td>
+    </tr>
+    <tr>
+      <td>水害（東京）</td>
+      <td>国土数値情報 A31</td>
+      <td>2022年版</td>
+      <td>国交省更新次第</td>
+    </tr>
+    <tr>
+      <td>水害（その他）</td>
+      <td>産総研 シームレス地質図</td>
+      <td>V2（随時）</td>
+      <td>APIリアルタイム</td>
+    </tr>
+    <tr>
+      <td>台風</td>
+      <td>気象庁 台風統計</td>
+      <td>1951〜2020年集計</td>
+      <td>未定（静的テーブル）</td>
+    </tr>
+    <tr>
+      <td>津波・高潮 / 土砂</td>
+      <td>国土地理院 標高API</td>
+      <td>リアルタイム</td>
+      <td>常時最新</td>
+    </tr>
+    <tr>
+      <td>液状化</td>
+      <td>産総研 シームレス地質図</td>
+      <td>V2（随時）</td>
+      <td>APIリアルタイム</td>
+    </tr>
+  </table>
+
+
+  <h2>5. 技術仕様</h2>
+  <ul>
+    <li>バックエンド：Python / FastAPI</li>
+    <li>地図ライブラリ：Leaflet.js / 国土地理院タイル</li>
+    <li>逆ジオコーダ：Nominatim（OpenStreetMap）+ 国土地理院 逆ジオコーダ（フォールバック）</li>
+    <li>ポリゴン判定：Shapely + STRtree（インメモリ空間インデックス）</li>
+    <li>洪水ポリゴン処理：起動時にロード、全リクエストで共有</li>
+  </ul>
+
+  <p style="margin-top:32px;font-size:.8rem;color:#aaa">
+    本サービスはプロトタイプです。データの誤り・改善提案はお気軽にご連絡ください。<br>
+    <a href="/terms.html" target="_blank" style="color:#3498db">利用規約</a> |
+    <a href="/" style="color:#3498db">トップに戻る</a>
+  </p>
+
+</div><!-- /container -->
+</body>
+</html>
