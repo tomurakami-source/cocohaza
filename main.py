@@ -76,9 +76,13 @@ async def lifespan(app: FastAPI):
 
     logger.info("ポリゴンデータのプリロードを開始...")
     data_dir = Path(__file__).parent / "data"
-    for path in sorted(data_dir.glob("flood_*.json")):
-        mesh = int(path.stem.replace("flood_", ""))
-        _load_flood_mesh(mesh)
+    # DISABLE_FLOOD_POLYGON=1 の場合は洪水ポリゴンを読み込まない（省メモリモード）
+    if os.getenv("DISABLE_FLOOD_POLYGON") != "1":
+        for path in sorted(data_dir.glob("flood_*.json")):
+            mesh = int(path.stem.replace("flood_", ""))
+            _load_flood_mesh(mesh)
+    else:
+        logger.info("省メモリモード: 洪水ポリゴンを無効化（地質推定でフォールバック）")
     _load_landslide_zones()
     _load_inland_flood_zones()
     _load_tsunami_zones()

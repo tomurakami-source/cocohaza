@@ -2,12 +2,11 @@ services:
   - type: web
     name: cocohaza
     runtime: python
-    plan: standard        # 2GB RAM（ポリゴンデータに必要）
+    plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: bash start.sh
-    healthCheckPath: /api/score?address=東京都千代田区
     envVars:
       - key: GOOGLE_MAPS_API_KEY
-        sync: false       # Render ダッシュボードで手動設定
-      - key: FLOOD_DATA_URL
-        sync: false       # Cloudflare R2 の URL を設定
+        sync: false           # Render ダッシュボードで設定
+      - key: DISABLE_FLOOD_POLYGON
+        value: "1"            # 無料プランは省メモリモードで起動
